@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trợ Lý Giáo Viên Toán AI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- MathJax -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            chtml: { fontCache: 'global' }
+        };
+    </script>
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        // Set the workerSrc for pdf.js
+        if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+        }
+    </script>
+    <!-- Mammoth.js for DOCX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <!-- Custom Styles -->
+    <style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        .disabled-card { pointer-events: none; opacity: 0.5; }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        .small-loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .prose { max-width: 65ch; }
+        .prose h1, .prose h2, .prose h3 { font-weight: 700; }
+        .prose p { margin-top: 1.25em; margin-bottom: 1.25em; }
+        .prose ul, .prose ol { margin-top: 1.25em; margin-bottom: 1.25em; padding-left: 1.75em; }
+        .prose li > p { margin-top: 0; margin-bottom: 0; }
+        .prose code { background-color: #f3f4f6; padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 3px; }
+        .prose pre { background-color: #f3f4f6; padding: 1em; border-radius: 0.5em; overflow-x: auto; }
+        .prose pre code { background-color: transparent; padding: 0; }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+
+    </style>
+     <script type="importmap">
+        {
+          "imports": {
+            "@google/genai": "https://esm.sh/@google/genai@^1.13.0"
+          }
+        }
+    </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Global Loader -->
+    <div id="global-loader" class="fixed inset-0 bg-white bg-opacity-80 z-50 flex-col items-center justify-center hidden">
+        <div class="loader"></div>
+        <p class="mt-4 text-lg font-semibold text-gray-700">AI đang xử lý, vui lòng chờ...</p>
+    </div>
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
+        <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/20 p-3 rounded-xl hidden sm:block">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                         <h1 class="text-2xl sm:text-3xl font-bold">Trợ Lý Giáo Viên Toán AI</h1>
+                         <p class="text-blue-100 mt-1 text-sm">
+                            Tác giả: Phạm Anh Dũng-Trường THPT Vọng Thê, An Giang<br>
+                            Zalo: 0946775808
+                         </p>
+                    </div>
+                </div>
+                 <details class="w-full md:w-auto mt-4 md:mt-0 relative">
+                    <summary class="cursor-pointer bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition flex items-center gap-2">
+                        <span>Cấu Hình</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <div class="absolute right-0 mt-2 p-4 border rounded-lg bg-white text-gray-800 shadow-xl w-80 z-10">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label for="api-key-input" class="block text-sm font-medium text-gray-700">Gemini API Key</label>
+                                <input type="password" id="api-key-input" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900" placeholder="Nhập API Key của bạn">
+                            </div>
+                            <div>
+                                <label for="google-script-url-input" class="block text-sm font-medium text-gray-700">Google Script Web App URL</label>
+                                <input type="url" id="google-script-url-input" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900" placeholder="URL để nộp bài">
+                            </div>
+                            <div>
+                                <label for="teacher-name-input" class="block text-sm font-medium text-gray-700">Tên Giáo Viên</label>
+                                <input type="text" id="teacher-name-input" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900" placeholder="Tên của bạn">
+                            </div>
+                            <button id="save-config-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Lưu Cấu Hình</button>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </header>
+
+        <main>
+            <!-- Workflow Choice -->
+            <div id="card-workflow-choice" class="text-center bg-white p-8 rounded-xl shadow-md disabled-card">
+                 <h2 class="text-2xl font-bold mb-4 text-gray-800">Bắt đầu tạo đề thi</h2>
+                 <p class="text-gray-600 mb-6 max-w-2xl mx-auto">Vui lòng hoàn tất cấu hình để kích hoạt. Sau đó, chọn một phương thức để tạo bộ câu hỏi của bạn: sử dụng AI để tạo từ đầu hoặc phân tích một tệp đề thi có sẵn.</p>
+                 <div class="flex flex-col sm:flex-row justify-center gap-4">
+                     <button id="btn-workflow-ai" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-transform transform hover:scale-105">✨ Tạo bằng AI</button>
+                     <button id="btn-workflow-file" class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition-transform transform hover:scale-105">📄 Phân tích từ File</button>
+                 </div>
+            </div>
+
+            <!-- AI Generation Workflow -->
+            <div id="workflow-ai-steps" class="hidden">
+                <button class="back-to-workflow-choice-btn mb-4 text-blue-600 hover:underline">&larr; Quay lại</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Step 1 & 2 -->
+                    <div class="bg-white p-6 rounded-xl shadow-md space-y-6">
+                        <div>
+                            <h3 class="font-bold text-lg mb-2">Bước 1: Nạp tài liệu kiến thức (Tùy chọn)</h3>
+                            <p class="text-sm text-gray-500 mb-3">Tải lên file .txt, .pdf, .docx, hoặc hình ảnh chứa nội dung lý thuyết, bài giảng để AI dựa vào đó tạo câu hỏi.</p>
+                            <label for="knowledge-file-input" id="knowledge-file-label" class="w-full flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+                                <svg class="w-6 h-6 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h4l3 3h6a4 4 0 014 4v7a4 4 0 01-4 4H7z"></path></svg>
+                                <span>Chọn tệp kiến thức</span>
+                            </label>
+                            <input type="file" id="knowledge-file-input" class="hidden" accept=".txt,.pdf,.docx,.png,.jpg,.jpeg">
+                            <div id="upload-status-ai" class="mt-2 text-sm text-gray-600">Chưa có tệp nào được chọn.</div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-lg mb-2">Bước 2: Thêm các yêu cầu cho đề thi</h3>
+                            <p class="text-sm text-gray-500 mb-3">Thêm lần lượt các yêu cầu về loại câu hỏi, số lượng và độ khó bạn muốn có trong đề thi.</p>
+                             <div class="space-y-4 p-4 border rounded-lg bg-gray-50">
+                                <textarea id="prompt-input" rows="3" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Nhập chủ đề hoặc nội dung chính cho các câu hỏi (ví dụ: 'nguyên hàm và tích phân')"></textarea>
+                                 <button id="clear-prompt-btn" class="hidden">Clear</button> <!-- Hidden but good to have -->
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <select id="question-type-select" class="w-full border-gray-300 rounded-md shadow-sm">
+                                        <option value="multiple-choice">Trắc nghiệm</option>
+                                        <option value="true-false">Đúng/Sai</option>
+                                        <option value="short-answer">Trả lời ngắn</option>
+                                        <option value="essay">Tự luận</option>
+                                    </select>
+                                    <input type="number" id="question-count-input" value="5" min="1" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Số lượng">
+                                    <select id="difficulty-select" class="w-full border-gray-300 rounded-md shadow-sm">
+                                        <option>Không yêu cầu</option>
+                                        <option>Nhận biết</option>
+                                        <option>Thông hiểu</option>
+                                        <option>Vận dụng</option>
+                                        <option>Vận dụng cao</option>
+                                    </select>
+                                </div>
+                                <button id="add-request-btn" class="w-full bg-blue-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-600">Thêm vào đề</button>
+                            </div>
+                            <div id="request-list-container" class="mt-4"></div>
+                        </div>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                         <h3 class="font-bold text-lg mb-2">Bước 3: Tạo Đề Thi</h3>
+                         <p class="text-sm text-gray-500 mb-4">Sau khi đã thêm tất cả yêu cầu, nhấn nút bên dưới để AI bắt đầu tạo đề thi cho bạn.</p>
+                         <button id="generate-button" class="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-lg hover:bg-green-700 transition text-lg">✨ TẠO ĐỀ THI TỪ CÁC YÊU CẦU</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Analysis Workflow -->
+             <div id="workflow-file-steps" class="hidden">
+                 <button class="back-to-workflow-choice-btn mb-4 text-blue-600 hover:underline">&larr; Quay lại</button>
+                 <div class="bg-white p-8 rounded-xl shadow-md max-w-2xl mx-auto text-center">
+                     <h3 class="font-bold text-xl mb-3">Phân tích đề thi từ tệp</h3>
+                     <p class="text-gray-600 mb-6">Tải lên một tệp đề thi có sẵn (PDF, DOCX). AI sẽ tự động phân tích, trích xuất câu hỏi, đáp án, và định dạng lại một cách khoa học.</p>
+                     <label for="analyze-file-input" id="analyze-file-label" class="w-full flex items-center justify-center px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                         <span class="font-semibold text-gray-700">Chọn tệp PDF hoặc DOCX để phân tích</span>
+                     </label>
+                     <input type="file" id="analyze-file-input" class="hidden" accept=".pdf,.docx">
+                     <div id="upload-status-file" class="mt-3 text-sm text-gray-600">Chưa có tệp nào được chọn.</div>
+                 </div>
+            </div>
+
+            <!-- Quiz Display Area -->
+            <div id="quiz-area" class="mt-8">
+                 <div id="shared-actions-container" class="hidden bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <h2 class="text-xl font-bold">Nội Dung Đề Thi</h2>
+                    <div class="flex items-center gap-3 flex-wrap justify-center">
+                         <button id="batch-insert-images-btn" class="bg-teal-100 text-teal-800 font-semibold py-2 px-4 rounded-lg hover:bg-teal-200 transition">Chèn Ảnh Thông Minh</button>
+                         <button id="generate-study-guide-btn" class="bg-purple-100 text-purple-800 font-semibold py-2 px-4 rounded-lg hover:bg-purple-200 transition">Tạo Ôn Tập</button>
+                         <button id="export-html-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition">Xuất File HTML</button>
+                    </div>
+                 </div>
+                 <div id="finalize-container" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-r-lg mb-4 flex items-center justify-between">
+                    <p>Bạn có <span id="dirty-count" class="font-bold"></span> thay đổi chưa được AI định dạng. Điều này có thể gây lỗi hiển thị.</p>
+                    <button id="finalize-edits-btn" class="bg-yellow-500 text-white font-semibold py-1 px-3 rounded hover:bg-yellow-600">Định dạng lại</button>
+                 </div>
+                 <div id="image-upload-container" class="hidden">
+                      <input type="file" id="image-folder-input" class="hidden" webkitdirectory directory multiple>
+                 </div>
+                 <div id="quiz-container" class="space-y-6"></div>
+                 <div id="placeholder" class="text-center bg-white p-10 rounded-xl shadow">
+                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                     <h3 class="mt-2 text-sm font-medium text-gray-900">Chưa có câu hỏi nào</h3>
+                     <p class="mt-1 text-sm text-gray-500">Hoàn tất cấu hình, sau đó tạo câu hỏi hoặc phân tích từ một tệp.</p>
+                 </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals (hidden by default) -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-20">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">Chỉnh sửa câu hỏi</h3>
+            <div class="mt-2 space-y-4">
+                <!-- Image Edit Section -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hình ảnh câu hỏi</label>
+                    <div id="edit-question-image-container" class="mb-2 p-2 border-2 border-dashed rounded-md min-h-[100px] bg-gray-50 flex items-center justify-center">
+                        <!-- Image preview will be injected here by JS -->
+                        <span class="text-gray-400 text-sm">Chưa có ảnh</span>
+                    </div>
+                    <input type="file" id="edit-image-file-input" class="hidden" accept="image/*">
+                    <div class="flex gap-2 items-center">
+                         <button type="button" id="edit-upload-image-btn" class="text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-md hover:bg-blue-200 transition">Tải ảnh lên</button>
+                         <button type="button" id="edit-paste-image-btn" class="text-sm bg-indigo-100 text-indigo-800 py-1 px-3 rounded-md hover:bg-indigo-200 transition">Dán ảnh</button>
+                         <button type="button" id="edit-delete-image-btn" class="hidden text-sm bg-red-100 text-red-700 py-1 px-3 rounded-md hover:bg-red-200 transition">Xóa ảnh</button>
+                    </div>
+                </div>
+                <div>
+                    <label for="edit-question-text" class="block text-sm font-medium text-gray-700">Nội dung câu hỏi</label>
+                    <textarea id="edit-question-text" rows="5" class="mt-1 w-full border-gray-300 rounded-md shadow-sm"></textarea>
+                </div>
+                <div id="edit-options-container" class="space-y-2"></div>
+            </div>
+            <div class="mt-4 flex justify-end gap-3">
+                <button id="cancel-edit-button" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Hủy</button>
+                <button id="save-edit-button" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+
+     <div id="export-options-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-30">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Tùy chọn xuất file</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="export-title-input" class="block text-sm font-medium text-gray-700">Tiêu đề bài thi</label>
+                    <input type="text" id="export-title-input" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ví dụ: Đề kiểm tra 15 phút">
+                    <p class="text-xs text-gray-500 mt-1">Để trống để dùng tiêu đề mặc định.</p>
+                </div>
+                <div>
+                    <label for="export-time-limit-input" class="block text-sm font-medium text-gray-700">Thời gian làm bài (phút)</label>
+                    <input type="number" id="export-time-limit-input" value="45" min="0" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-xs text-gray-500 mt-1">Nhập 0 để không giới hạn thời gian.</p>
+                </div>
+                 <div>
+                    <label for="export-retries-input" class="block text-sm font-medium text-gray-700">Số lần làm lại tối đa</label>
+                    <input type="number" id="export-retries-input" value="1" min="0" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                     <p class="text-xs text-gray-500 mt-1">Nhập 0 để không giới hạn số lần làm lại.</p>
+                </div>
+                <div class="relative flex items-start">
+                    <div class="flex h-5 items-center">
+                        <input id="export-show-answers-check" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </div>
+                    <div class="ml-3 text-sm">
+                        <label for="export-show-answers-check" class="font-medium text-gray-700">Cho xem đáp án đúng</label>
+                        <p class="text-gray-500">Sau khi nộp bài, học sinh có thể thấy câu trả lời đúng.</p>
+                    </div>
+                </div>
+                 <div class="relative flex items-start">
+                    <div class="flex h-5 items-center">
+                        <input id="export-show-explanation-check" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </div>
+                    <div class="ml-3 text-sm">
+                        <label for="export-show-explanation-check" class="font-medium text-gray-700">Cho xem giải thích của AI</label>
+                        <p class="text-gray-500">Hiển thị lời giải chi tiết do AI tạo ra sau khi nộp bài.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="cancel-export-btn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Hủy</button>
+                <button id="confirm-export-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700">Xác nhận xuất</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="study-guide-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-40 p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b">
+                 <h3 class="text-xl font-bold">Đề cương ôn tập (AI tạo)</h3>
+                 <div class="flex items-center gap-2">
+                    <button id="copy-study-guide-btn" class="bg-blue-100 text-blue-800 p-2 rounded-full hover:bg-blue-200 transition" title="Copy nội dung">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                    <button id="close-study-guide-btn" class="bg-gray-200 text-gray-800 p-2 rounded-full hover:bg-gray-300 transition" title="Đóng">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                 </div>
+            </div>
+            <div id="study-guide-loader" class="text-center py-10">
+                <div class="loader mx-auto"></div>
+                <p class="mt-3 text-gray-600">AI đang tổng hợp kiến thức và tạo đề cương...</p>
+            </div>
+            <div id="study-guide-content" class="prose max-w-none overflow-y-auto flex-grow">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center text-sm text-gray-500 py-4">
+        Trợ Lý Giáo Viên Toán AI - Phiên bản 2.5
+    </footer>
+
+    <script type="module" src="./index.js"></script>
+
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
