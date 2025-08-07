@@ -1384,102 +1384,166 @@ YÊU CẦU:
     }
 }
 
+// Dán đoạn mã này vào tệp index.js của bạn, thay thế cho hàm analyzeFileForQuiz cũ.
+
 async function analyzeFileForQuiz(file) {
-    if (!ai) {
-        alert("Vui lòng cấu hình API Key trước.");
-        return;
-    }
+    if (!file) return;
+
+    // --- Cập nhật giao diện: Bắt đầu quá trình ---
     const originalHTML = analyzeFileLabel.innerHTML;
     toggleUploadLoading(true, analyzeFileLabel, originalHTML);
     globalLoader.style.display = 'flex';
+    setUploadStatus(uploadStatusFile, `Bắt đầu phân tích tệp PDF...`);
 
     try {
-        let textContent;
+        // --- Định nghĩa các mẫu RegExp (tương tự file Python) ---
+        const questionPattern = /^(Câu|Question)\s*(\d+)[:.]?/i;
+        const optionPattern = /^[A-D][.)]/;
 
-        // --- Step 1: Extract Text Content ---
-        if (file.type === 'application/pdf') {
-            setUploadStatus(uploadStatusFile, `Đang trích xuất văn bản từ PDF...`);
-            textContent = await extractTextFromPdf(file);
-        } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            setUploadStatus(uploadStatusFile, `Đang trích xuất văn bản từ DOCX...`);
-            textContent = await extractTextFromDocx(file);
-        } else {
-            throw new Error("Định dạng tệp không được hỗ trợ. Vui lòng chọn tệp PDF hoặc DOCX.");
-        }
+        // --- Tải tệp PDF bằng PDF.js ---
+        const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        let allQuestions = [];
+        let questionCounter = 0; // Đếm tổng số câu hỏi đã trích xuất
 
-        if (!textContent || textContent.trim().length < 20) {
-            throw new Error("Không thể trích xuất nội dung văn bản hoặc nội dung quá ngắn để phân tích.");
-        }
-        
-        setUploadStatus(uploadStatusFile, `Đã trích xuất nội dung. AI đang phân tích đề thi...`);
+        // --- Lặp qua từng trang của PDF ---
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            setUploadStatus(uploadStatusFile, `Đang xử lý trang ${pageNum}/${pdf.numPages}...`);
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.0 });
 
-        // --- Step 2: Build the AI Prompt ---
-        const systemPrompt = `Bạn là một AI chuyên gia phân tích đề thi toán học. Dựa vào nội dung văn bản được cung cấp, hãy trích xuất TẤT CẢ các câu hỏi thành một mảng JSON duy nhất.
+            // --- Lấy CẢ VĂN BẢN và HÌNH ẢNH ---
+            const textContent = await page.getTextContent();
+            const operatorList = await page.getOperatorList();
+            
+            let elements = [];
 
-QUY TẮC PHÂN TÍCH:
--   **Output:** Toàn bộ output phải là một mảng JSON duy nhất.
--   **Số thứ tự:** BẮT BUỘC trích xuất số thứ tự gốc của câu hỏi (ví dụ: 'Câu 1' -> 1) và đặt vào trường "questionNumber".
--   **Định dạng Toán học:** Tất cả công thức toán học PHẢI được định dạng bằng LaTeX (sử dụng $...$ và $$...$$).
--   **Tìm đáp án đúng:** Hãy nỗ lực hết sức để tìm đáp án đúng cho mọi loại câu hỏi (dựa vào văn bản gạch chân, in đậm, hoặc bảng đáp án). Nếu không tìm thấy, hãy tự giải để tìm ra đáp án.
+            // 1. Thêm các mục văn bản vào danh sách elements
+            textContent.items.forEach(item => {
+                elements.push({
+                    type: 'text',
+                    content: item.str,
+                    // Tọa độ y (vị trí từ đỉnh trang), x
+                    bbox: [item.transform[4], viewport.height - item.transform[5], item.transform[4] + item.width, viewport.height - item.transform[5] + item.height]
+                });
+            });
 
-CẤU TRÚC JSON CHO TỪNG LOẠI CÂU HỎI:
-1.  **Trắc nghiệm (multiple-choice):**
-    -   \`{"type": "multiple-choice", "questionNumber": <số>, "question": "...", "options": ["A", "B", "C", "D"], "correctAnswerIndex": <0-3>}\`
-    -   "options" không chứa tiền tố 'A.', 'B.'.
-2.  **Đúng/Sai (true-false):**
-    -   \`{"type": "true-false", "questionNumber": <số>, "main_question": "...", "statements": [{"statement": "...", "is_correct": true/false}]}\`
-3.  **Trả lời ngắn (short-answer):**
-    -   \`{"type": "short-answer", "questionNumber": <số>, "question": "...", "answer": "..."}\`
-4.  **Tự luận (essay):**
-    -   \`{"type": "essay", "questionNumber": <số>, "question": "...", "answer": "Gợi ý..."}\`
+            // 2. Tìm và thêm hình ảnh vào danh sách elements
+            const imagePromises = [];
+            for (let i = 0; i < operatorList.fnArray.length; i++) {
+                // Tìm toán tử vẽ hình ảnh
+                if (operatorList.fnArray[i] === pdfjsLib.OPS.paintImageXObject) {
+                    const op = operatorList.argsArray[i][0];
+                    imagePromises.push(
+                        page.objs.get(op).then(img => {
+                            // Ước tính bounding box của ảnh (phần này phức tạp hơn PyMuPDF)
+                            // Chúng ta sẽ tạm dùng tọa độ gần nhất của text để xác định vị trí
+                            // Một cách tiếp cận đơn giản là giả định ảnh chiếm một không gian nhất định
+                            const width = img.width || 100; // default size
+                            const height = img.height || 100;
 
----
-BẮT ĐẦU PHÂN TÍCH NỘI DUNG VĂN BẢN:
-${textContent}`;
-        
-        // --- Step 3: Call AI and Process Response ---
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: systemPrompt,
-            config: {
-                responseMimeType: "application/json",
+                            // Chuyển đổi ảnh sang base64 để hiển thị trực tiếp
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            const imgData = new ImageData(new Uint8ClampedArray(img.data), width, height);
+                            ctx.putImageData(imgData, 0, 0);
+                            
+                            elements.push({
+                                type: 'image',
+                                content: canvas.toDataURL(),
+                                bbox: [0, 0, width, height] // Placeholder bbox, sẽ được cập nhật sau
+                            });
+                        })
+                    );
+                }
             }
-        });
-        
-        const resultText = response.text;
-        if (resultText) {
-            let cleanedText = resultText.trim();
-            if (cleanedText.startsWith('```json')) cleanedText = cleanedText.substring(7);
-            if (cleanedText.endsWith('```')) cleanedText = cleanedText.slice(0, -3);
-            
-            let newQuizData = JSON.parse(cleanedText);
-            
-            quizData = newQuizData;
-            renderQuiz();
-            setUploadStatus(uploadStatusFile, `✓ Phân tích thành công ${quizData.length} câu hỏi từ tệp.`, false);
-        } else {
-            throw new Error("AI không thể phân tích văn bản.");
+            await Promise.all(imagePromises);
+
+            // 3. Sắp xếp tất cả các thành phần theo thứ tự đọc (quan trọng nhất!)
+            // Sắp xếp theo tọa độ y (từ trên xuống), sau đó theo tọa độ x (từ trái qua)
+            elements.sort((a, b) => {
+                if (Math.abs(a.bbox[1] - b.bbox[1]) > 5) { // Nếu khác dòng
+                    return a.bbox[1] - b.bbox[1];
+                } else { // Nếu cùng dòng
+                    return a.bbox[0] - b.bbox[0];
+                }
+            });
+
+            // --- Bắt đầu phân tích các thành phần đã sắp xếp ---
+            let currentQuestion = null;
+            let isParsingOptions = false;
+
+            for (const el of elements) {
+                if (el.type === 'text' && el.content.trim()) {
+                    const text = el.content.trim();
+                    const questionMatch = text.match(questionPattern);
+
+                    if (questionMatch) {
+                        // Nếu có câu hỏi hiện tại, lưu nó lại
+                        if (currentQuestion) {
+                            allQuestions.push(currentQuestion);
+                        }
+                        
+                        // Bắt đầu câu hỏi mới
+                        questionCounter++;
+                        currentQuestion = {
+                            type: 'multiple-choice', // Mặc định là trắc nghiệm
+                            questionNumber: parseInt(questionMatch[2], 10),
+                            question: text,
+                            options: [],
+                            correctAnswerIndex: null, // Sẽ cần logic để tìm đáp án đúng
+                            questionImage: null
+                        };
+                        isParsingOptions = false;
+
+                    } else if (optionPattern.test(text)) {
+                        if (currentQuestion) {
+                            isParsingOptions = true;
+                            currentQuestion.options.push(text);
+                        }
+                    } else if (currentQuestion) {
+                        // Nếu đang trong quá trình đọc đáp án và có text mới, ghép vào đáp án cuối cùng
+                        if (isParsingOptions && currentQuestion.options.length > 0) {
+                             currentQuestion.options[currentQuestion.options.length - 1] += ' ' + text;
+                        } else {
+                        // Ngược lại, ghép vào nội dung câu hỏi
+                            currentQuestion.question += ' ' + text;
+                        }
+                    }
+                } else if (el.type === 'image') {
+                    if (currentQuestion && !isParsingOptions) {
+                        // Gán hình ảnh cho câu hỏi hiện tại nếu nó xuất hiện trước các đáp án
+                        currentQuestion.questionImage = el.content;
+                    }
+                }
+            }
+            // Đừng quên lưu câu hỏi cuối cùng của trang
+            if (currentQuestion) {
+                allQuestions.push(currentQuestion);
+            }
         }
+        
+        // --- Hoàn tất và hiển thị kết quả ---
+        // Dọn dẹp lại text câu hỏi và đáp án
+        allQuestions.forEach(q => {
+            q.question = q.question.replace(questionPattern, '').trim();
+            q.options = q.options.map(opt => opt.replace(optionPattern, '').trim());
+        });
+
+        quizData = allQuestions;
+        renderQuiz();
+        setUploadStatus(uploadStatusFile, `✓ Phân tích thành công ${quizData.length} câu hỏi từ tệp.`, false);
 
     } catch (error) {
-        console.error("Lỗi khi phân tích tệp:", error);
-        let errorMessage = error.message;
-        if (error.cause) {
-            try {
-                const causeBody = JSON.parse(error.cause.message.split('\n').slice(1).join('\n'));
-                if(causeBody.error && causeBody.error.message) {
-                    errorMessage = causeBody.error.message;
-                }
-            } catch(e) { /* Ignore parsing error */ }
-        }
-        setUploadStatus(uploadStatusFile, `Lỗi phân tích tệp: ${errorMessage}`, true);
+        console.error("Lỗi khi phân tích tệp PDF:", error);
+        setUploadStatus(uploadStatusFile, `Lỗi phân tích tệp: ${error.message}`, true);
     } finally {
         toggleUploadLoading(false, analyzeFileLabel, originalHTML);
         analyzeFileInput.value = '';
         globalLoader.style.display = 'none';
     }
 }
-
 function resetToWorkflowChoice() {
     // Hide all workflow steps
     workflowAiSteps.classList.add('hidden');
